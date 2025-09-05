@@ -100,16 +100,46 @@ ROS2节点架构
 ### 3.3 仿真环境设计
 
 #### 3.3.1 测试场景
-1. **简单房间**: 矩形房间，基础导航测试
-2. **复杂房间**: 多房间布局，家具障碍物
+1. **简单房间**: 矩形房间，基础导航测试（mobile_robot_world.world）
+2. **办公环境**: 开放式办公室布局，真实办公场景导航测试（office_world.world）
 3. **动态环境**: 移动障碍物，动态避障测试
 
-#### 3.3.2 环境元素
-- 墙壁和门
-- 家具（桌子、椅子、沙发）
-- 地毯和不同地面材质
-- 充电桩
-- 垃圾和清扫目标
+#### 3.3.2 已实现的办公环境场景（office_world.world）
+
+**空间布局**:
+- **开放式办公区域**: 12m×12m的开放式办公空间，无屋顶设计便于俯视观察
+- **地面系统**: 使用9块`nist_elevated_floor_120`模型构建3×3网格地面
+- **围墙结构**: 使用`grey_wall`模型构建完整的外墙系统（东、西、南、北墙）
+- **内部分区**: 通过隔断墙创建不同的办公功能区域
+
+**办公家具配置**:
+- **办公桌区域**:
+  - 2张标准办公桌（`table`模型）
+  - 1张大理石桌（`table_marble`模型）
+  - 1张会议桌（`cafe_table`模型）
+- **存储家具**:
+  - 东西两侧各1个书架（`bookshelf`模型）
+  - 南北两侧各1个文件柜（`cabinet`模型）
+
+**障碍物和动态元素**:
+- **静态障碍物**: 2个纸箱（`cardboard_box`模型）随机摆放
+- **动态障碍物**: 2个办公人员（`person_standing`模型）
+- **门禁系统**: 东西两侧各1扇门（`hinged_door`模型）
+
+**照明系统**:
+- 室内点光源照明，营造真实的办公环境光照
+- 适中的环境光设置，支持传感器正常工作
+
+**物理仿真配置**:
+- ODE物理引擎，重力加速度9.8m/s²
+- 优化的碰撞检测和约束求解参数
+- 250Hz实时更新频率，确保仿真精度
+
+#### 3.3.3 环境特点和导航挑战
+- **空间复杂性**: 多个办公区域，需要路径规划算法处理复杂空间
+- **动态障碍物**: 办公人员模拟真实环境中的动态避障需求
+- **狭窄通道**: 家具间的通道测试机器人的精确导航能力
+- **多目标导航**: 不同办公区域间的导航路径规划
 
 #### 3.3.3 可复用Gazebo模型资源
 
@@ -224,10 +254,11 @@ ROS2节点架构
   - 360度激光雷达传感器
   - 完整的物理属性和碰撞检测
 - ✅ 构建了丰富的仿真世界，集成现有Gazebo模型：
-  - 房屋环境（house_1）
-  - 家具障碍物（cafe_table, bookshelf, cabinet）
+  - 基础测试环境（mobile_robot_world.world）：房屋环境（house_1）
+  - 办公环境（office_world.world）：开放式办公室布局
+  - 家具障碍物（table, table_marble, cafe_table, bookshelf, cabinet）
   - 动态障碍物（person_standing）
-  - 装饰元素（oak_tree, lamp_post）
+  - 建筑结构（grey_wall, hinged_door, nist_elevated_floor_120）
 - ✅ 配置了完整的启动系统
 - ✅ 验证了仿真环境的功能：
   - 机器人成功生成并可控制
@@ -430,48 +461,56 @@ mobile_robot_navigation/
 
 ### 9.1 在世界文件中引用模型
 
-在Gazebo世界文件(.world)中引用现有模型的示例：
+基于实际office_world.world的模型引用示例：
 
 ```xml
 <?xml version="1.0" ?>
 <sdf version="1.5">
-  <world name="mobile_robot_world">
-    <!-- 添加地面 -->
+  <world name="office_world">
+    <!-- 全局设置 -->
     <include>
       <uri>model://ground_plane</uri>
     </include>
 
-    <!-- 添加TurtleBot机器人 -->
+    <!-- 室内地板系统 -->
     <include>
-      <uri>model://turtlebot</uri>
-      <pose>0 0 0 0 0 0</pose>
+      <uri>model://nist_elevated_floor_120</uri>
+      <name>floor_1</name>
+      <pose>-3 -3 0 0 0 0</pose>
     </include>
+    <!-- 更多地板块... -->
 
-    <!-- 添加Hokuyo激光雷达 -->
+    <!-- 办公家具 -->
     <include>
-      <uri>model://hokuyo</uri>
-      <pose>0 0 0.5 0 0 0</pose>
-    </include>
-
-    <!-- 添加房屋环境 -->
-    <include>
-      <uri>model://house_1</uri>
-      <pose>5 5 0 0 0 0</pose>
-    </include>
-
-    <!-- 添加家具障碍物 -->
-    <include>
-      <uri>model://cafe_table</uri>
+      <uri>model://table</uri>
+      <name>office_table_1</name>
       <pose>2 2 0 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://bookshelf</uri>
-      <pose>3 1 0 0 0 1.57</pose>
+      <name>bookshelf_east</name>
+      <pose>4 0 0 0 0 1.57</pose>
+    </include>
+
+    <!-- 墙壁结构 -->
+    <include>
+      <uri>model://grey_wall</uri>
+      <name>east_wall_1</name>
+      <pose>6 -3 0 0 0 1.57</pose>
+    </include>
+
+    <!-- 动态障碍物 -->
+    <include>
+      <uri>model://person_standing</uri>
+      <name>person_1</name>
+      <pose>1 3 0 0 0 3.14</pose>
     </include>
   </world>
 </sdf>
 ```
+
+**重要提示**: 每个模型都必须设置唯一的`name`属性，避免同类型模型被覆盖。
 
 ### 9.2 启动文件配置
 
@@ -491,7 +530,7 @@ def generate_launch_description():
             '/launch/gazebo.launch.py'
         ]),
         launch_arguments={
-            'world': 'mobile_robot_world.world',
+            'world': 'office_world.world',
             'verbose': 'true'
         }.items()
     )
@@ -504,13 +543,18 @@ def generate_launch_description():
 
 ### 9.3 推荐的模型组合
 
-**基础导航测试环境**:
+**基础导航测试环境（mobile_robot_world.world）**:
 - 机器人: `turtlebot` + `hokuyo`
 - 环境: `ground_plane` + 简单障碍物(`cardboard_box`, `construction_cone`)
 
-**室内导航测试环境**:
-- 机器人: `pioneer2dx` + `kinect`
-- 环境: `house_1` + `cafe_table` + `bookshelf` + `cabinet`
+**办公环境导航测试（office_world.world）**:
+- 机器人: 自定义TurtleBot模型 + 360度激光雷达
+- 环境配置:
+  - 地面: 9块`nist_elevated_floor_120`构建12m×12m空间
+  - 墙壁: `grey_wall`构建完整围墙系统
+  - 家具: `table`, `table_marble`, `cafe_table`, `bookshelf`, `cabinet`
+  - 障碍物: `cardboard_box`（静态）+ `person_standing`（动态）
+  - 门禁: `hinged_door`模拟真实出入口
 
 **复杂多房间环境**:
 - 机器人: `husky` + `velodyne_hdl32`
@@ -531,8 +575,8 @@ def generate_launch_description():
 
 ---
 
-**文档版本**: v1.1
-**创建日期**: 2024年
-**更新日期**: 2024年12月
-**作者**: ROS2开发团队
-**更新内容**: 添加可复用Gazebo模型资源调研和使用指南
+**文档版本**: v1.2
+**创建日期**: 2025年
+**更新日期**: 2025年9月
+**作者**: Satone
+**更新内容**: 基于office_world.world实际配置更新仿真环境描述和模型使用指南
